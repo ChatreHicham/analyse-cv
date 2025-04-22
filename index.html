@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <title>Analyse de CV</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="container">
+    <h2>🔍 Analyse de CV intelligente</h2>
+    <p>Importez votre CV et indiquez le poste ciblé :</p>
+
+    <form id="cvForm">
+      <input type="file" id="cvFile" accept=".pdf" required>
+      <input type="text" id="jobInput" placeholder="Ex: Développeur full-stack" required>
+      <button type="submit">Analyser</button>
+    </form>
+
+    <div id="result">
+      <!-- Results will be displayed here -->
+    </div>
+  </div>
+
+  <script>
+    const form = document.getElementById("cvForm");
+    const resultDiv = document.getElementById("result");
+    let startTime;
+    let progressInterval;
+
+    form.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const file = document.getElementById("cvFile").files[0];
+      const jobTitle = document.getElementById("jobInput").value;
+
+      if (!file || !jobTitle) {
+        resultDiv.innerHTML = `<div class="error">Fichier PDF et poste requis</div>`;
+        return;
+      }
+
+      startTime = new Date();
+      showLoadingAnimation();
+
+      const formData = new FormData();
+      formData.append("file", file);
+      formData.append("job_title", jobTitle);
+
+      try {
+        const response = await fetch("http://127.0.0.1:8000/upload-cv", {
+          method: "POST",
+          body: formData
+        });
+
+        const data = await response.json();
+        if (data.error) throw new Error(data.error);
+
+        clearInterval(progressInterval);
+        displayResults(data);
+      } catch (err) {
+        clearInterval(progressInterval);
+        resultDiv.innerHTML = `<div class="error">Erreur : ${err.message}</div>`;
+      }
+    });
+
+    function showLoadingAnimation() {
+      resultDiv.innerHTML = `
+        <div class="loading-container">
+          <div class="loader"></div>
+          <div class="progress-text">Analyse de votre CV en cours...</div>
+          <div class="progress-bar">
+            <div class="progress" id="progressBar"></div>
+          </div>
+          <div class="timer" id="timer">0 secondes</div>
+        </div>
+      `;
+      
+      let seconds = 0;
+      const progressBar = document.getElementById("progressBar");
+      const timerElement = document.getElementById("timer");
+      
+      progressInterval = setInterval(() => {
+        seconds++;
+        timerElement.textContent = `${seconds} seconde${seconds > 1 ? 's' : ''}`;
+        
+        const progress = Math.min(80, seconds * 10);
+        progressBar.style.width = `${progress}%`;
+      }, 1000);
+    }
+
+    function displayResults(data) {
+      const endTime = new Date();
+      const duration = Math.round((endTime - startTime) / 1000);
+      
+      resultDiv.innerHTML = `
+        <div class="section">
+          <div class="section-title">Informations personnelles</div>
+          <div class="item"><strong>Nom :</strong> ${data.name || 'Non trouvé'}</div>
+          <div class="item"><strong>Email :</strong> ${data.email || 'Non trouvé'}</div>
+          <div class="item"><strong>Téléphone :</strong> ${data.phone || 'Non trouvé'}</div>
+          <div class="item"><strong>Langue principale :</strong> ${data.language || 'Non détectée'}</div>
+        </div>
+
+        <div class="section">
+          <div class="section-title">🌐 Langues</div>
+          ${data.langues?.map(lang => `<div class="item">• ${lang}</div>`).join("") || '<div class="item">Aucune</div>'}
+        </div>
+
+        <div class="section">
+          <div class="section-title">💼 Compétences</div>
+          <div class="skills-container">
+            ${data.competences?.map(c => `<span class="skill-pill">${c}</span>`).join("") || '<div class="item">Aucune</div>'}
+          </div>
+        </div>
+
+        <div class="section">
+          <div class="section-title">🎓 Formations</div>
+          ${data.formations?.map(f => `<div class="item">• ${f.diplome} - ${f.ecole} (${f.date})</div>`).join("") || '<div class="item">Aucune</div>'}
+        </div>
+
+        <div class="section">
+          <div class="section-title">💼 Expériences professionnelles</div>
+          ${data.experiences?.map(e => `<div class="item">• ${e.poste} chez ${e.entreprise} (${e.date})</div>`).join("") || '<div class="item">Aucune</div>'}
+        </div>
+
+        <div class="section">
+          <div class="section-title">📄 Autres informations</div>
+          ${data.autres_infos?.map(i => `<div class="item">• ${i}</div>`).join("") || '<div class="item">Rien de plus</div>'}
+        </div>
+
+        <div class="section">
+          <div class="section-title">📈 Retour sur le profil</div>
+          <div class="item">${data.analyse_du_profil || 'Non fourni'}</div>
+        </div>
+        
+        <div class="item" style="text-align: center; margin-top: 2rem; color: #666;">
+          Analyse complétée en ${duration} seconde${duration > 1 ? 's' : ''}
+        </div>
+      `;
+    }
+  </script>
+</body>
+</html>
